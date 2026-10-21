@@ -1,0 +1,54 @@
+name: Crear APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Descomprimir proyecto (si se subio el zip)
+        run: |
+          if [ -f latina-store-apk-proyecto.zip ]; then unzip -o latina-store-apk-proyecto.zip; fi
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Crear proyecto Android
+        run: npx cap add android
+
+      - name: Generar iconos con el logo
+        run: npx capacitor-assets generate --android --iconBackgroundColor '#4a2e1c' --iconBackgroundColorDark '#4a2e1c'
+
+      - name: Permiso de camara
+        run: |
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />\n</manifest>#' android/app/src/main/AndroidManifest.xml
+          cat android/app/src/main/AndroidManifest.xml
+
+      - name: Sincronizar la app
+        run: npx cap sync android
+
+      - name: Compilar APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Guardar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LatinaStore-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
